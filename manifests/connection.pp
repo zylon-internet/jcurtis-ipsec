@@ -17,44 +17,19 @@ define ipsec::connection(
   validate_re($name, '^(.*)-[tT][oO]-(.*)$',
   "${name} must be in the format of '<server1>-To-<server2>'")
 
-  if $ensure == 'present' {
-    $ifupdown = 'ifup'
-  } else {
-    $ifupdown = 'ifdown'
-  }
-
-
   include ipsec
 
-  file { "ifcfg-${name}":
-    ensure  => $ensure,
-    path    => "${ipsec::params::dir}/ifcfg-${name}",
-    content => template($template),
-    owner   => 'root',
-    group   => 'root',
-    mode    => '0644',
-    require => Package['ipsec'],
-  }
-
-  file { "keys-${name}":
-    ensure  => $ensure,
-    path    => "${ipsec::params::dir}/keys-${name}",
-    content => template($key_template),
-    owner   => 'root',
-    group   => 'root',
-    mode    => '0600',
-    require => File["ifcfg-${name}"],
-    notify  => Exec["${ifupdown} ${name}"],
-  }
-
-  exec { "ifup ${name}":
-    path        => ['/sbin'],
-    creates     => "${ipsec::params::racoon_dir}/${destination}.conf",
-  }
-
-  exec { "ifdown ${name}":
-    path        => ['/sbin'],
-    refreshonly => true,
+  # Some OS specific settings:
+  # On Redhat
+  case $::osfamily {
+    'redhat': {
+      include ipsec::connection::redhat
+    }
+    'debian': {
+    }
+    default: {
+      fail("Class['ipsec::connection']: Unsupported osfamily: ${::osfamily}")
+    }
   }
 
   # Export to destination server
